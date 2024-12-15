@@ -190,6 +190,10 @@ func (c *Client) RefreshToken(ctx context.Context) error {
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
 		return nil
 	}
+	if token.AccessToken == "" {
+		log.Printf("failed to refresh token: %v", token)
+		return fmt.Errorf("failed to refresh token")
+	}
 	token.CreatedAt = time.Now()
 
 	c.token = &token
