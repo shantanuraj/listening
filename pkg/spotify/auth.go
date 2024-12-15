@@ -2,35 +2,169 @@ package spotify
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/shantanuraj/listening/pkg/dirs"
 )
 
-const authEndpoint = "https://accounts.spotify.com/api/token"
+const (
+	spotifyAuthURL  = "https://accounts.spotify.com/authorize"
+	spotifyTokenURL = "https://accounts.spotify.com/api/token"
+	scope           = "user-read-currently-playing"
+)
 
 var (
 	clientID     = os.Getenv("SL_SPOTIFY_CLIENT_ID")
 	clientSecret = os.Getenv("SL_SPOTIFY_CLIENT_SECRET")
 )
 
+func redirectURL(addr string) string {
+	return fmt.Sprintf("%s%s", addr, "/callback")
+}
+
+func generateState() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return base64.URLEncoding.EncodeToString(b)
+}
+
+func authURL(addr string, state string) string {
+	return fmt.Sprintf(
+		"%s?response_type=code&client_id=%s&redirect_uri=%s&state=%s&scope=%s",
+		spotifyAuthURL,
+		clientID,
+		redirectURL(addr),
+		state,
+		scope,
+	)
+}
+
 func (c *Client) IsAuthenticated() bool {
 	return c.token != nil && !c.token.HasExpired()
 }
 
-func (c *Client) Authenticate(ctx context.Context) (*TokenResponse, error) {
+func (c *Client) RegisterAuthenticationHandlers(
+	addr string,
+	mux *http.ServeMux,
+) error {
+	if clientID == "" || clientSecret == "" {
+		return fmt.Errorf("missing client ID or client secret")
+	}
+
+	credentialsPath, err := dirs.CredentialsPath()
+	if err != nil {
+		return fmt.Errorf("failed to get credentials path: %w", err)
+	}
+
+	if !c.IsAuthenticated() {
+		token, err := loadToken(credentialsPath)
+		if err != nil {
+			return fmt.Errorf("failed to load persisted token: %w", err)
+		}
+		if token != nil {
+			c.token = token
+			log.Printf("Authenticated as %s", token.AccessToken[:8])
+		}
+	}
+
+	state := generateState()
+
+	mux.Handle(
+		"GET /",
+		http.RedirectHandler(authURL(addr, state), http.StatusTemporaryRedirect),
+	)
+	mux.Handle("GET /callback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		if query.Get("state") != state {
+			http.Error(w, "state mismatch", http.StatusBadRequest)
+			return
+		}
+
+		code := query.Get("code")
+		if code == "" {
+			http.Error(w, "missing code", http.StatusBadRequest)
+			return
+		}
+
+		ctx := r.Context()
+
+		token, err := c.ExchangeCodeForToken(ctx, addr, code)
+		if err != nil {
+			http.Error(w, "failed to exchange code for token", http.StatusInternalServerError)
+			return
+		}
+
+		c.token = token
+		log.Printf("Authenticated as %s", token.AccessToken[:8])
+
+		if err := saveToken(token, credentialsPath); err != nil {
+			log.Printf("failed to save token: %v", err)
+		}
+
+		http.Redirect(w, r, "/current", http.StatusTemporaryRedirect)
+	}))
+
+	return nil
+}
+
+func saveToken(token *TokenResponse, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	return json.NewEncoder(file).Encode(token)
+}
+
+func loadToken(path string) (*TokenResponse, error) {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var token TokenResponse
+	if err := json.NewDecoder(file).Decode(&token); err != nil {
+		return nil, err
+	}
+
+	return &token, nil
+}
+
+func (c *Client) ExchangeCodeForToken(
+	ctx context.Context,
+	addr string,
+	code string,
+) (*TokenResponse, error) {
+	if clientID == "" || clientSecret == "" {
+		return nil, fmt.Errorf("missing client ID or client secret")
+	}
+
 	data := url.Values{}
-	data.Set("grant_type", "client_credentials")
+	data.Set("grant_type", "authorization_code")
+	data.Set("code", code)
+	data.Set("redirect_uri", redirectURL(addr))
 	data.Set("client_id", clientID)
 	data.Set("client_secret", clientSecret)
 
 	req, err := http.NewRequestWithContext(
 		ctx,
 		"POST",
-		authEndpoint,
+		spotifyTokenURL,
 		strings.NewReader(data.Encode()),
 	)
 	if err != nil {
@@ -49,19 +183,19 @@ func (c *Client) Authenticate(ctx context.Context) (*TokenResponse, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
 		return nil, err
 	}
-
-	str, _ := json.MarshalIndent(token, "", "  ")
-	println(string(str))
+	token.CreatedAt = time.Now()
 
 	return &token, nil
 }
 
 type TokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int64  `json:"expires_in"`
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
+	RefreshToken string `json:"refresh_token"`
+	Scope        string `json:"scope"`
 
-	CreatedAt time.Time `json:"-"` // Time when the token was created, not part of the JSON response
+	CreatedAt time.Time `json:"created_at"` // Time when the token was created, not part of the JSON response
 }
 
 func (t TokenResponse) HasExpired() bool {
