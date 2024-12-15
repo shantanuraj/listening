@@ -1,6 +1,7 @@
 package spotify
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -90,6 +91,7 @@ func (c *Client) RegisterAuthenticationHandlers(
 		http.RedirectHandler(authURL(addr, state), http.StatusTemporaryRedirect),
 	)
 	mux.Handle("GET /callback", spotifyCallbackHandler(c, state, addr, credentialsPath))
+	mux.Handle("POST /refresh", refreshHandler(c))
 
 	return nil
 }
@@ -259,6 +261,20 @@ func (c *Client) ExchangeCodeForToken(
 	token.CreatedAt = time.Now()
 
 	return &token, nil
+}
+
+func refreshHandler(c *Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		if err := c.RefreshToken(ctx); err != nil {
+			log.Printf("failed to refresh token: %v", err)
+			http.Error(w, "failed to refresh token", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 type TokenResponse struct {
