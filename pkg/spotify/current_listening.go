@@ -14,6 +14,7 @@ func (c Client) CurrentlyListening(ctx context.Context) (*CurrentlyPlayingRespon
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode == 204 {
 		return nil, nil

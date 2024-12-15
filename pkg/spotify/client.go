@@ -2,37 +2,39 @@ package spotify
 
 import (
 	"context"
+	"fmt"
 	"net/http"
-	"os"
 	"time"
 )
 
 type Client struct {
-	authToken  string
-	userAgent  string
+	token      *TokenResponse
 	httpClient *http.Client
 }
 
 const host = "https://api.spotify.com/v1"
 
 var DefaultClient = &Client{
-	authToken: "Bearer " + os.Getenv("SL_TOKEN"),
-	userAgent: "sraj.me/listening",
 	httpClient: &http.Client{
 		Timeout: time.Second * 10,
 	},
 }
 
-func (c Client) Get(ctx context.Context, path string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", host+path, nil)
+func (c *Client) Get(ctx context.Context, path string) (*http.Response, error) {
+	url := host + path
+	fmt.Println(url)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header = http.Header{
-		"Authorization": []string{c.authToken},
-		"User-Agent":    []string{c.userAgent},
+		"Authorization": []string{"Bearer " + c.token.AccessToken},
 	}
 
 	return c.httpClient.Do(req)
+}
+
+func (c *Client) SetToken(token *TokenResponse) {
+	c.token = token
 }

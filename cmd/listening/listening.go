@@ -13,6 +13,14 @@ func main() {
 
 	client := spotify.DefaultClient
 
+	if !client.IsAuthenticated() {
+		token, err := client.Authenticate(ctx)
+		if err != nil {
+			log.Fatalf("failed to authenticate: %v", err)
+		}
+		client.SetToken(token)
+	}
+
 	listening, err := client.CurrentlyListening(ctx)
 	if err != nil {
 		log.Fatalf("failed to get currently listening: %v", err)
