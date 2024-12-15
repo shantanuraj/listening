@@ -27,7 +27,7 @@ func main() {
 	mux.HandleFunc("GET /current", currentTrackHandler(client))
 
 	log.Printf("listening on %s", addr)
-	http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux)
+	http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), withCors(mux))
 }
 
 var storedTrack atomic.Value
