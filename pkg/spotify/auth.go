@@ -162,9 +162,15 @@ func loadToken(path string) (*TokenResponse, error) {
 }
 
 func (c *Client) RefreshToken(ctx context.Context) error {
+	if c.token == nil {
+		return fmt.Errorf("no token to refresh")
+	}
+
+	refreshToken := c.token.RefreshToken
+
 	data := url.Values{}
 	data.Set("grant_type", "refresh_token")
-	data.Set("refresh_token", c.token.RefreshToken)
+	data.Set("refresh_token", refreshToken)
 	data.Set("client_id", clientID)
 	data.Set("client_secret", clientSecret)
 
@@ -195,6 +201,7 @@ func (c *Client) RefreshToken(ctx context.Context) error {
 		return fmt.Errorf("failed to refresh token")
 	}
 	token.CreatedAt = time.Now()
+	token.RefreshToken = cmp.Or(token.RefreshToken, refreshToken)
 
 	c.token = &token
 	log.Printf("Authenticated as %s", token.AccessToken[:8])
