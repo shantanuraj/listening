@@ -23,8 +23,14 @@ func main() {
 	mux := http.NewServeMux()
 
 	client.RegisterAuthenticationHandlers(addr, mux)
+	mux.HandleFunc("GET /current", currentTrackHandler(client))
 
-	mux.HandleFunc("GET /current", func(w http.ResponseWriter, r *http.Request) {
+	log.Printf("listening on %s", addr)
+	http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux)
+}
+
+func currentTrackHandler(client *spotify.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
 		if !client.IsAuthenticated() {
@@ -53,8 +59,5 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(listening)
-	})
-
-	log.Printf("listening on %s", addr)
-	http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux)
+	}
 }

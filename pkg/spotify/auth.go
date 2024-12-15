@@ -89,7 +89,18 @@ func (c *Client) RegisterAuthenticationHandlers(
 		"GET /",
 		http.RedirectHandler(authURL(addr, state), http.StatusTemporaryRedirect),
 	)
-	mux.Handle("GET /callback", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("GET /callback", spotifyCallbackHandler(c, state, addr, credentialsPath))
+
+	return nil
+}
+
+func spotifyCallbackHandler(
+	c *Client,
+	state string,
+	addr string,
+	credentialsPath string,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		if query.Get("state") != state {
 			http.Error(w, "state mismatch", http.StatusBadRequest)
@@ -118,9 +129,7 @@ func (c *Client) RegisterAuthenticationHandlers(
 		}
 
 		http.Redirect(w, r, "/current", http.StatusTemporaryRedirect)
-	}))
-
-	return nil
+	}
 }
 
 func saveToken(token *TokenResponse, path string) error {
