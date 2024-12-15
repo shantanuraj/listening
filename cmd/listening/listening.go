@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync/atomic"
 
 	"github.com/shantanuraj/listening/pkg/spotify"
 )
@@ -29,9 +30,22 @@ func main() {
 	http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux)
 }
 
+var storedTrack atomic.Value
+
 func currentTrackHandler(client *spotify.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+
+		writeResponse := true
+
+		if stored := storedTrack.Load(); stored != nil {
+			log.Println("serving stored track")
+			track := stored.(*spotify.CurrentlyPlayingResponse)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(track)
+			writeResponse = false
+		}
 
 		if !client.IsAuthenticated() {
 			if client.IsTokenExpired() {
@@ -45,9 +59,20 @@ func currentTrackHandler(client *spotify.Client) http.HandlerFunc {
 			}
 		}
 
+		log.Println("fetching currently listening")
+
 		listening, err := client.CurrentlyListening(ctx)
 		if err != nil {
-			http.Error(w, "failed to get currently listening", http.StatusInternalServerError)
+			log.Printf("failed to fetch currently listening: %v", err)
+		} else {
+			storedTrack.Store(listening)
+		}
+		if !writeResponse {
+			return
+		}
+
+		if err != nil {
+			http.Error(w, "failed to fetch currently listening", http.StatusInternalServerError)
 			return
 		}
 
