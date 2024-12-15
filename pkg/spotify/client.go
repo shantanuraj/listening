@@ -2,7 +2,6 @@ package spotify
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 )
@@ -22,7 +21,6 @@ var DefaultClient = &Client{
 
 func (c *Client) Get(ctx context.Context, path string) (*http.Response, error) {
 	url := host + path
-	fmt.Println(url)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err

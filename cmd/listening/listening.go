@@ -2,9 +2,9 @@ package main
 
 import (
 	"cmp"
-	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -18,8 +18,6 @@ var (
 )
 
 func main() {
-	ctx := context.Background()
-
 	client := spotify.DefaultClient
 
 	mux := http.NewServeMux()
@@ -27,9 +25,18 @@ func main() {
 	client.RegisterAuthenticationHandlers(addr, mux)
 
 	mux.HandleFunc("GET /current", func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
 		if !client.IsAuthenticated() {
-			http.Error(w, "not authenticated", http.StatusUnauthorized)
-			return
+			if client.IsTokenExpired() {
+				if err := client.RefreshToken(ctx); err != nil {
+					http.Error(w, "failed to refresh token", http.StatusInternalServerError)
+					return
+				}
+			} else {
+				http.Error(w, "not authenticated", http.StatusUnauthorized)
+				return
+			}
 		}
 
 		listening, err := client.CurrentlyListening(ctx)
@@ -48,6 +55,6 @@ func main() {
 		json.NewEncoder(w).Encode(listening)
 	})
 
-	fmt.Printf("listening on %s\n", addr)
+	log.Printf("listening on %s", addr)
 	http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux)
 }

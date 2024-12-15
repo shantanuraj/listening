@@ -52,6 +52,13 @@ func (c *Client) IsAuthenticated() bool {
 	return c.token != nil && !c.token.HasExpired()
 }
 
+func (c *Client) IsTokenExpired() bool {
+	if c.token == nil {
+		return false
+	}
+	return c.token.HasExpired()
+}
+
 func (c *Client) RegisterAuthenticationHandlers(
 	addr string,
 	mux *http.ServeMux,
@@ -143,6 +150,52 @@ func loadToken(path string) (*TokenResponse, error) {
 	}
 
 	return &token, nil
+}
+
+func (c *Client) RefreshToken(ctx context.Context) error {
+	data := url.Values{}
+	data.Set("grant_type", "refresh_token")
+	data.Set("refresh_token", c.token.RefreshToken)
+	data.Set("client_id", clientID)
+	data.Set("client_secret", clientSecret)
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		"POST",
+		spotifyTokenURL,
+		strings.NewReader(data.Encode()),
+	)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var token TokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
+		return nil
+	}
+	token.CreatedAt = time.Now()
+
+	c.token = &token
+	log.Printf("Authenticated as %s", token.AccessToken[:8])
+
+	credentialsPath, err := dirs.CredentialsPath()
+	if err != nil {
+		return fmt.Errorf("failed to get credentials path: %w", err)
+	}
+
+	if err := saveToken(&token, credentialsPath); err != nil {
+		log.Printf("failed to save token: %v", err)
+	}
+
+	return nil
 }
 
 func (c *Client) ExchangeCodeForToken(
