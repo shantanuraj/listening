@@ -28,6 +28,7 @@ func main() {
 	client.RegisterAuthenticationHandlers(addr, mux)
 	mux.HandleFunc("GET /current", currentTrackHandler(client))
 	mux.HandleFunc("GET /queue", queueHandler(client))
+	mux.HandleFunc("GET /recent", recentHandler(client))
 	mux.HandleFunc("PUT /play", playHandler(client))
 
 	log.Printf("listening on %s", addr)
@@ -101,8 +102,8 @@ func currentTrackHandler(client *spotify.Client) http.HandlerFunc {
 
 var storedQueue atomic.Value
 
-const defaultQueueLimit = 5
-const queueCap = 15
+const defaultLimit = 5
+const maxLimit = 15
 
 func queueHandler(client *spotify.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +112,7 @@ func queueHandler(client *spotify.Client) http.HandlerFunc {
 		query := r.URL.Query()
 		skipCache := query.Has("skip-cache")
 
-		limit := defaultQueueLimit
+		limit := defaultLimit
 		limitStr := query.Get("limit")
 		if limitStr != "" {
 			limitValue, err := strconv.Atoi(limitStr)
@@ -119,7 +120,7 @@ func queueHandler(client *spotify.Client) http.HandlerFunc {
 				http.Error(w, "invalid limit", http.StatusBadRequest)
 				return
 			}
-			if limitValue < 1 || limitValue > queueCap {
+			if limitValue < 1 || limitValue > maxLimit {
 				http.Error(w, "invalid limit", http.StatusBadRequest)
 				return
 			}
@@ -184,6 +185,53 @@ func queueHandler(client *spotify.Client) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(queue)
+	}
+}
+
+func recentHandler(client *spotify.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+
+		query := r.URL.Query()
+
+		limit := defaultLimit
+		limitStr := query.Get("limit")
+		if limitStr != "" {
+			limitValue, err := strconv.Atoi(limitStr)
+			if err != nil {
+				http.Error(w, "invalid limit", http.StatusBadRequest)
+				return
+			}
+			if limitValue < 1 || limitValue > maxLimit {
+				http.Error(w, "invalid limit", http.StatusBadRequest)
+				return
+			}
+			limit = limitValue
+		}
+
+		if !client.IsAuthenticated() {
+			if client.IsTokenExpired() {
+				if err := client.RefreshToken(ctx); err != nil {
+					log.Printf("recent: failed to refresh token: %v", err)
+					http.Error(w, "recent: failed to refresh token", http.StatusInternalServerError)
+					return
+				}
+			} else {
+				http.Error(w, "not authenticated", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		recent, err := client.RecentlyPlayed(ctx, limit)
+		if err != nil {
+			log.Printf("failed to fetch recently played: %v", err)
+			http.Error(w, "failed to fetch recently played", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(recent)
 	}
 }
 

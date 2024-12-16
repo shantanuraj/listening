@@ -19,7 +19,7 @@ import (
 const (
 	spotifyAuthURL  = "https://accounts.spotify.com/authorize"
 	spotifyTokenURL = "https://accounts.spotify.com/api/token"
-	scope           = "user-read-currently-playing user-read-playback-state user-modify-playback-state"
+	scope           = "user-read-currently-playing user-read-playback-state user-modify-playback-state user-read-recently-played"
 )
 
 var (
