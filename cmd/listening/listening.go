@@ -36,9 +36,12 @@ func currentTrackHandler(client *spotify.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
+		query := r.URL.Query()
+		skipCache := query.Has("skip-cache")
+
 		writeResponse := true
 
-		if stored := storedTrack.Load(); stored != nil {
+		if stored := storedTrack.Load(); !skipCache && stored != nil {
 			log.Println("serving stored track")
 			track := stored.(*spotify.CurrentlyPlayingResponse)
 			w.Header().Set("Content-Type", "application/json")
