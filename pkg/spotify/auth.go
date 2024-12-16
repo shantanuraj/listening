@@ -193,6 +193,10 @@ func (c *Client) RefreshToken(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("refresh: invalid status code: %d", resp.StatusCode)
+	}
+
 	var token TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
 		return err
@@ -258,6 +262,10 @@ func (c *Client) ExchangeCodeForToken(
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("exchange: invalid status code: %d", resp.StatusCode)
+	}
 
 	var token TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
