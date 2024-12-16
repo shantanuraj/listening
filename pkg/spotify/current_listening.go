@@ -20,8 +20,8 @@ func (c Client) CurrentlyListening(ctx context.Context) (*CurrentlyPlayingRespon
 		return nil, nil
 	}
 	if resp.StatusCode != 200 {
-		log.Printf("unexpected status code: %d", resp.StatusCode)
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		log.Printf("current: unexpected status code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("current: unexpected status code: %d", resp.StatusCode)
 	}
 
 	var currentlyPlaying CurrentlyPlayingResponse

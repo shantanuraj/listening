@@ -206,10 +206,10 @@ func (c *Client) RefreshToken(ctx context.Context) error {
 		return fmt.Errorf("invalid token response")
 	}
 	token.CreatedAt = time.Now()
-	if token.RefreshToken == "" {
+	if token.RefreshToken == "" && refreshToken != "" {
 		log.Printf(
 			"no refresh token in response using existing refresh token: %s",
-			refreshToken,
+			refreshToken[:8],
 		)
 		token.RefreshToken = refreshToken
 	}
