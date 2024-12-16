@@ -1,7 +1,6 @@
 package spotify
 
 import (
-	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/base64"
@@ -203,7 +202,13 @@ func (c *Client) RefreshToken(ctx context.Context) error {
 		return fmt.Errorf("invalid token response")
 	}
 	token.CreatedAt = time.Now()
-	token.RefreshToken = cmp.Or(token.RefreshToken, refreshToken)
+	if token.RefreshToken == "" {
+		log.Printf(
+			"no refresh token in response using existing refresh token: %s",
+			refreshToken,
+		)
+		token.RefreshToken = refreshToken
+	}
 
 	c.token = &token
 	log.Printf("Authenticated as %s", token.AccessToken[:8])
