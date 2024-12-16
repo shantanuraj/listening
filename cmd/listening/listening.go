@@ -50,7 +50,8 @@ func currentTrackHandler(client *spotify.Client) http.HandlerFunc {
 		if !client.IsAuthenticated() {
 			if client.IsTokenExpired() {
 				if err := client.RefreshToken(ctx); err != nil {
-					http.Error(w, "failed to refresh token", http.StatusInternalServerError)
+					log.Printf("current track: failed to refresh token: %v", err)
+					http.Error(w, "current track: failed to refresh token", http.StatusInternalServerError)
 					return
 				}
 			} else {
