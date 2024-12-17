@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+
+	"github.com/shantanuraj/listening/pkg/log"
 )
 
 const currentlyListeningEndpoint = "/me/player/currently-playing"
@@ -20,12 +21,13 @@ func (c Client) CurrentlyListening(ctx context.Context) (*CurrentlyPlayingRespon
 		return nil, nil
 	}
 	if resp.StatusCode != 200 {
-		log.Printf("current: unexpected status code: %d", resp.StatusCode)
+		log.Errorf("current: unexpected status code: %d", resp.StatusCode)
 		return nil, fmt.Errorf("current: unexpected status code: %d", resp.StatusCode)
 	}
 
 	var currentlyPlaying CurrentlyPlayingResponse
 	if err := json.NewDecoder(resp.Body).Decode(&currentlyPlaying); err != nil {
+		log.Errorf("current: failed to decode response: %v", err)
 		return nil, err
 	}
 

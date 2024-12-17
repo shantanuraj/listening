@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/shantanuraj/listening/pkg/dirs"
+	"github.com/shantanuraj/listening/pkg/log"
 )
 
 const (
@@ -79,7 +79,7 @@ func (c *Client) RegisterAuthenticationHandlers(
 		}
 		if token != nil {
 			c.token = token
-			log.Printf("Authenticated as %s", token.AccessToken[:8])
+			log.Infof("Authenticated as %s", token.AccessToken[:8])
 		}
 	}
 
@@ -123,10 +123,10 @@ func spotifyCallbackHandler(
 		}
 
 		c.token = token
-		log.Printf("Authenticated as %s", token.AccessToken[:8])
+		log.Infof("Authenticated as %s", token.AccessToken[:8])
 
 		if err := saveToken(token, credentialsPath); err != nil {
-			log.Printf("failed to save token: %v", err)
+			log.Errorf("failed to save token: %v", err)
 		}
 
 		http.Redirect(w, r, "/current", http.StatusTemporaryRedirect)
@@ -202,20 +202,16 @@ func (c *Client) RefreshToken(ctx context.Context) error {
 		return err
 	}
 	if token.AccessToken == "" {
-		log.Printf("invalid token response: %v", token)
+		log.Errorf("invalid token response: %v", token)
 		return fmt.Errorf("invalid token response")
 	}
 	token.CreatedAt = time.Now()
 	if token.RefreshToken == "" && refreshToken != "" {
-		log.Printf(
-			"no refresh token in response using existing refresh token: %s",
-			refreshToken[:8],
-		)
 		token.RefreshToken = refreshToken
 	}
 
 	c.token = &token
-	log.Printf("Authenticated as %s", token.AccessToken[:8])
+	log.Infof("Authenticated as %s", token.AccessToken[:8])
 
 	credentialsPath, err := dirs.CredentialsPath()
 	if err != nil {
@@ -223,7 +219,7 @@ func (c *Client) RefreshToken(ctx context.Context) error {
 	}
 
 	if err := saveToken(&token, credentialsPath); err != nil {
-		log.Printf("failed to save token: %v", err)
+		log.Errorf("failed to save token: %v", err)
 	}
 
 	return nil
@@ -281,7 +277,7 @@ func refreshHandler(c *Client) http.HandlerFunc {
 		ctx := r.Context()
 
 		if err := c.RefreshToken(ctx); err != nil {
-			log.Printf("failed to refresh token: %v", err)
+			log.Errorf("failed to refresh token: %v", err)
 			http.Error(w, "failed to refresh token", http.StatusInternalServerError)
 			return
 		}

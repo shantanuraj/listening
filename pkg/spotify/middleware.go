@@ -1,8 +1,9 @@
 package spotify
 
 import (
-	"log"
 	"net/http"
+
+	"github.com/shantanuraj/listening/pkg/log"
 )
 
 func (c *Client) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -12,7 +13,7 @@ func (c *Client) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if !c.IsAuthenticated() {
 			if c.IsTokenExpired() {
 				if err := c.RefreshToken(ctx); err != nil {
-					log.Printf("auth: failed to refresh token: %v", err)
+					log.Errorf("auth: failed to refresh token: %v", err)
 					http.Error(w, "failed to refresh token", http.StatusInternalServerError)
 					return
 				}

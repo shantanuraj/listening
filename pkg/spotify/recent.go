@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"time"
+
+	"github.com/shantanuraj/listening/pkg/log"
 )
 
 const recentEndpoint = "/me/player/recently-played"
@@ -18,12 +19,13 @@ func (c Client) RecentlyPlayed(ctx context.Context, limit int) (*RecentlyPlayedR
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Printf("recently played: unexpected status code: %d", resp.StatusCode)
+		log.Errorf("recently played: unexpected status code: %d", resp.StatusCode)
 		return nil, fmt.Errorf("recently played: unexpected status code: %d", resp.StatusCode)
 	}
 
 	var recent RecentlyPlayedResponse
 	if err := json.NewDecoder(resp.Body).Decode(&recent); err != nil {
+		log.Errorf("recently played: failed to decode response: %v", err)
 		return nil, err
 	}
 
