@@ -32,7 +32,9 @@ func main() {
 	mux.HandleFunc("PUT /play", client.AuthMiddleware(playHandler(client)))
 
 	log.Printf("listening on %s", addr)
-	http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), withCors(mux))
+	if err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), withCors(mux)); err != nil {
+		log.Fatalf("failed to listen at %s %v", addr, err)
+	}
 }
 
 var storedTrack atomic.Value
