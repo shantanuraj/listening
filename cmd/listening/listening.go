@@ -26,10 +26,10 @@ func main() {
 	mux := http.NewServeMux()
 
 	client.RegisterAuthenticationHandlers(addr, mux)
-	mux.HandleFunc("GET /current", currentTrackHandler(client))
-	mux.HandleFunc("GET /queue", queueHandler(client))
-	mux.HandleFunc("GET /recent", recentHandler(client))
-	mux.HandleFunc("PUT /play", playHandler(client))
+	mux.HandleFunc("GET /current", client.AuthMiddleware(currentTrackHandler(client)))
+	mux.HandleFunc("GET /queue", client.AuthMiddleware(queueHandler(client)))
+	mux.HandleFunc("GET /recent", client.AuthMiddleware(recentHandler(client)))
+	mux.HandleFunc("PUT /play", client.AuthMiddleware(playHandler(client)))
 
 	log.Printf("listening on %s", addr)
 	http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), withCors(mux))
@@ -49,27 +49,8 @@ func currentTrackHandler(client *spotify.Client) http.HandlerFunc {
 		if stored := storedTrack.Load(); !skipCache && stored != nil {
 			log.Println("serving stored track")
 			track := stored.(*spotify.CurrentlyPlayingResponse)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(track)
+			writeJSON(w, track)
 			writeResponse = false
-		}
-
-		if !client.IsAuthenticated() {
-			if client.IsTokenExpired() {
-				if err := client.RefreshToken(ctx); err != nil {
-					log.Printf("current track: failed to refresh token: %v", err)
-					http.Error(
-						w,
-						"current track: failed to refresh token",
-						http.StatusInternalServerError,
-					)
-					return
-				}
-			} else {
-				http.Error(w, "not authenticated", http.StatusUnauthorized)
-				return
-			}
 		}
 
 		log.Println("fetching currently listening")
@@ -94,9 +75,7 @@ func currentTrackHandler(client *spotify.Client) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(listening)
+		writeJSON(w, listening)
 	}
 }
 
@@ -132,30 +111,11 @@ func queueHandler(client *spotify.Client) http.HandlerFunc {
 		if stored := storedQueue.Load(); !skipCache && stored != nil {
 			log.Println("serving stored queue")
 			queue := stored.(*spotify.QueueResponse)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
 			if queue != nil {
 				queue.Queue = funk.Range(queue.Queue, 0, limit)
 			}
-			json.NewEncoder(w).Encode(queue)
+			writeJSON(w, queue)
 			writeResponse = false
-		}
-
-		if !client.IsAuthenticated() {
-			if client.IsTokenExpired() {
-				if err := client.RefreshToken(ctx); err != nil {
-					log.Printf("queue: failed to refresh token: %v", err)
-					http.Error(
-						w,
-						"queue: failed to refresh token",
-						http.StatusInternalServerError,
-					)
-					return
-				}
-			} else {
-				http.Error(w, "not authenticated", http.StatusUnauthorized)
-				return
-			}
 		}
 
 		log.Println("fetching queue")
@@ -182,9 +142,7 @@ func queueHandler(client *spotify.Client) http.HandlerFunc {
 
 		queue.Queue = funk.Range(queue.Queue, 0, limit)
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(queue)
+		writeJSON(w, queue)
 	}
 }
 
@@ -209,18 +167,7 @@ func recentHandler(client *spotify.Client) http.HandlerFunc {
 			limit = limitValue
 		}
 
-		if !client.IsAuthenticated() {
-			if client.IsTokenExpired() {
-				if err := client.RefreshToken(ctx); err != nil {
-					log.Printf("recent: failed to refresh token: %v", err)
-					http.Error(w, "recent: failed to refresh token", http.StatusInternalServerError)
-					return
-				}
-			} else {
-				http.Error(w, "not authenticated", http.StatusUnauthorized)
-				return
-			}
-		}
+		log.Printf("fetching recent tracks")
 
 		recent, err := client.RecentlyPlayed(ctx, limit)
 		if err != nil {
@@ -229,28 +176,13 @@ func recentHandler(client *spotify.Client) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(recent)
+		writeJSON(w, recent)
 	}
 }
 
 func playHandler(client *spotify.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-
-		if !client.IsAuthenticated() {
-			if client.IsTokenExpired() {
-				if err := client.RefreshToken(ctx); err != nil {
-					log.Printf("play: failed to refresh token: %v", err)
-					http.Error(w, "play: failed to refresh token", http.StatusInternalServerError)
-					return
-				}
-			} else {
-				http.Error(w, "not authenticated", http.StatusUnauthorized)
-				return
-			}
-		}
 
 		var req spotify.PlayRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
