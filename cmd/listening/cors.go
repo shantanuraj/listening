@@ -2,11 +2,6 @@ package main
 
 import "net/http"
 
-var enabledOrigins = []string{
-	"http://localhost:4321",
-	"https://sraj.me",
-}
-
 func isValidOrigin(origin string) bool {
 	for _, o := range enabledOrigins {
 		if o == origin {

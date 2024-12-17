@@ -15,9 +15,13 @@ import (
 )
 
 var (
-	host = cmp.Or(os.Getenv("SL_HOST"), "localhost")
-	port = cmp.Or(os.Getenv("SL_PORT"), "5050")
-	addr = cmp.Or(os.Getenv("SL_ADDR"), fmt.Sprintf("http://%s:%s", host, port))
+	host           = cmp.Or(os.Getenv("SL_HOST"), "localhost")
+	port           = cmp.Or(os.Getenv("SL_PORT"), "5050")
+	addr           = cmp.Or(os.Getenv("SL_ADDR"), fmt.Sprintf("http://%s:%s", host, port))
+	enabledOrigins = []string{
+		cmp.Or(os.Getenv("SL_DEV_ORIGIN"), "http://localhost:4321"),
+		cmp.Or(os.Getenv("SL_PROD_ORIGIN"), "https://sraj.me"),
+	}
 )
 
 func main() {
