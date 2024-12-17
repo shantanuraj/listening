@@ -15,11 +15,11 @@ type PlayRequest struct {
 	ContextURI string   `json:"context_uri,omitempty"`
 	URIs       []string `json:"uris,omitempty"`
 	Offset     Offset   `json:"offset,omitempty"`
-	PositionMS int      `json:"position_ms,omitempty"`
+	PositionMS int      `json:"position_ms"`
 }
 
 type Offset struct {
-	Position int    `json:"position,omitempty"`
+	Position *int   `json:"position,omitempty"`
 	URI      string `json:"uri,omitempty"`
 }
 
@@ -37,6 +37,8 @@ func (c Client) Play(ctx context.Context, req PlayRequest) error {
 
 	if resp.StatusCode != 204 {
 		log.Errorf("play: unexpected status code: %d", resp.StatusCode)
+		reqStr, _ := json.MarshalIndent(req, "", "  ")
+		log.Errorf("play: request: %s", reqStr)
 		return fmt.Errorf("play: unexpected status code: %d", resp.StatusCode)
 	}
 
