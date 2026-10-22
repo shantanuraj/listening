@@ -14,7 +14,7 @@ const playEndpoint = "/me/player/play"
 type PlayRequest struct {
 	ContextURI string   `json:"context_uri,omitempty"`
 	URIs       []string `json:"uris,omitempty"`
-	Offset     Offset   `json:"offset,omitempty"`
+	Offset     Offset   `json:"offset"`
 	PositionMS int      `json:"position_ms"`
 }
 
